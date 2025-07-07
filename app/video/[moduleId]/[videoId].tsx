@@ -9,10 +9,10 @@ import {
   Platform,
   SafeAreaView,
 } from 'react-native';
-import { router, useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { ArrowLeft, User, Video, Clock, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { GlobalTextStyles } from '../../../components/ui/GlobalStyles';
-import { useVideoData } from '../../../hooks/useVideoData';
+import { useVideoData } from '../../../hooks/useVideoData'; // Using real Supabase data
 import { VideoPlayer } from '../../../components/video/VideoPlayer';
 import { VideoTabs } from '../../../components/video/VideoTabs';
 
@@ -22,9 +22,45 @@ export default function VideoScreen() {
   const { moduleId, videoId } = useLocalSearchParams<{ moduleId: string; videoId: string }>();
   const { video, module, loading, error, updateProgress, navigateToVideo } = useVideoData(moduleId!, videoId!);
   const [activeTab, setActiveTab] = useState<'transcript' | 'documents'>('transcript');
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('');
+  const [isScreenFocused, setIsScreenFocused] = useState(true);
+
+  // Track screen focus to stop video when navigating away
+  useFocusEffect(
+    React.useCallback(() => {
+      console.log('Video screen focused');
+      setIsScreenFocused(true);
+      
+      return () => {
+        console.log('Video screen unfocused - stopping video');
+        setIsScreenFocused(false);
+        // Clear video URL to stop playback immediately
+        setCurrentVideoUrl('');
+      };
+    }, [])
+  );
+
+  // Update video URL when video data changes and screen is focused
+  useEffect(() => {
+    if (video?.videoUrl && isScreenFocused) {
+      console.log('Setting new video URL:', video.videoUrl);
+      setCurrentVideoUrl(video.videoUrl);
+    } else if (!isScreenFocused) {
+      // Clear video URL when screen is not focused
+      setCurrentVideoUrl('');
+    }
+  }, [video?.videoUrl, isScreenFocused]);
 
   const handleBack = () => {
-    router.back();
+    console.log('Back button pressed - stopping video and navigating to home');
+    // Immediately stop video by clearing URL
+    setCurrentVideoUrl('');
+    setIsScreenFocused(false);
+    
+    // Small delay to ensure video stops before navigation
+    setTimeout(() => {
+      router.push('/(main)/home');
+    }, 100);
   };
 
   const handleProfile = () => {
@@ -32,22 +68,38 @@ export default function VideoScreen() {
     console.log('Navigate to profile');
   };
 
-  const handlePreviousVideo = () => {
+  const handlePreviousVideo = async () => {
     if (video && module) {
       const currentIndex = module.videos?.findIndex(v => v.id === video.id) || 0;
       if (currentIndex > 0) {
         const previousVideo = module.videos![currentIndex - 1];
-        navigateToVideo(previousVideo.id);
+        console.log('Navigating to previous video:', previousVideo.id);
+        
+        // Clear current video URL first to stop playback
+        setCurrentVideoUrl('');
+        
+        // Small delay to ensure video stops before navigation
+        setTimeout(() => {
+          navigateToVideo(previousVideo.id);
+        }, 100);
       }
     }
   };
 
-  const handleNextVideo = () => {
+  const handleNextVideo = async () => {
     if (video && module) {
       const currentIndex = module.videos?.findIndex(v => v.id === video.id) || 0;
       if (currentIndex < (module.videos?.length || 0) - 1) {
         const nextVideo = module.videos![currentIndex + 1];
-        navigateToVideo(nextVideo.id);
+        console.log('Navigating to next video:', nextVideo.id);
+        
+        // Clear current video URL first to stop playback
+        setCurrentVideoUrl('');
+        
+        // Small delay to ensure video stops before navigation
+        setTimeout(() => {
+          navigateToVideo(nextVideo.id);
+        }, 100);
       }
     }
   };
@@ -92,7 +144,7 @@ export default function VideoScreen() {
             {error || 'The requested video could not be loaded.'}
           </Text>
           <TouchableOpacity onPress={handleBack} style={styles.backButton}>
-            <Text style={styles.backButtonText}>Go Back</Text>
+            <Text style={styles.backButtonText}>Go Back to Modules</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -109,6 +161,15 @@ export default function VideoScreen() {
           <ArrowLeft size={24} color="#2b2b2b" />
         </TouchableOpacity>
         
+        <View style={styles.headerCenter}>
+          <Text style={[GlobalTextStyles.h6, styles.moduleTitle]} numberOfLines={1}>
+            {module.title}
+          </Text>
+          <Text style={[GlobalTextStyles.caption, styles.videoCounter]}>
+            Video {videoIndex.current} of {videoIndex.total}
+          </Text>
+        </View>
+        
         <TouchableOpacity onPress={handleProfile} style={styles.headerButton}>
           <User size={24} color="#2b2b2b" />
         </TouchableOpacity>
@@ -122,7 +183,7 @@ export default function VideoScreen() {
         {/* Video Player */}
         <View style={styles.videoContainer}>
           <VideoPlayer
-            videoUrl={video.videoUrl}
+            videoUrl={currentVideoUrl}
             thumbnailUrl={module.thumbnailUrl}
             onProgress={updateProgress}
             autoPlay={true}
@@ -192,6 +253,12 @@ export default function VideoScreen() {
               size={24} 
               color={canNavigatePrevious() ? "#ffffff" : "#cccccc"} 
             />
+            <Text style={[
+              styles.navButtonText,
+              !canNavigatePrevious() && styles.disabledButtonText
+            ]}>
+              Previous
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -203,10 +270,24 @@ export default function VideoScreen() {
               !canNavigateNext() && styles.disabledButton
             ]}
           >
+            <Text style={[
+              styles.navButtonText,
+              !canNavigateNext() && styles.disabledButtonText
+            ]}>
+              Next
+            </Text>
             <ChevronRight 
               size={24} 
               color={canNavigateNext() ? "#ffffff" : "#cccccc"} 
             />
+          </TouchableOpacity>
+        </View>
+
+        {/* Back to Module Button */}
+        <View style={styles.backToModuleContainer}>
+          <TouchableOpacity onPress={handleBack} style={styles.backToModuleButton}>
+            <ArrowLeft size={20} color="#001e70" />
+            <Text style={styles.backToModuleText}>Back to All Modules</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -227,6 +308,8 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 16,
     backgroundColor: '#fffbf8',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 30, 112, 0.1)',
   },
   headerButton: {
     width: 40,
@@ -244,11 +327,26 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+  },
+  moduleTitle: {
+    color: '#2b2b2b',
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  videoCounter: {
+    color: '#666666',
+    fontWeight: '500',
+  },
   scrollContainer: {
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 120, // Account for tab bar and navigation
+    paddingBottom: 140, // Account for tab bar and navigation
   },
   videoContainer: {
     width: '100%',
@@ -309,11 +407,12 @@ const styles = StyleSheet.create({
     gap: 16,
   },
   navButton: {
-    width: 120,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: 'center',
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+    gap: 8,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -331,6 +430,38 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: '#e5e7eb',
+  },
+  navButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Nunito-SemiBold' : 'Nunito-SemiBold',
+  },
+  disabledButtonText: {
+    color: '#9ca3af',
+  },
+  backToModuleContainer: {
+    paddingHorizontal: 24,
+    paddingTop: 32,
+    paddingBottom: 16,
+  },
+  backToModuleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    backgroundColor: 'rgba(0, 30, 112, 0.1)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0, 30, 112, 0.2)',
+    gap: 8,
+  },
+  backToModuleText: {
+    color: '#001e70',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Nunito-SemiBold' : 'Nunito-SemiBold',
   },
   loadingContainer: {
     flex: 1,

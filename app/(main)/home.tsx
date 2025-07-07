@@ -12,8 +12,8 @@ import { router } from 'expo-router';
 import { MainLayout } from '../../components/layout/MainLayout';
 import { ModuleList } from '../../components/modules/ModuleList';
 import { GlobalTextStyles } from '../../components/ui/GlobalStyles';
-import { useModules } from '../../hooks/useModules';
-import { ArrowLeft, User } from 'lucide-react-native';
+import { useModules } from '../../hooks/useModules'; // Using real Supabase data
+import { User } from 'lucide-react-native';
 import type { OnboardingModule } from '../../types/module';
 
 export default function HomeScreen() {
@@ -23,7 +23,7 @@ export default function HomeScreen() {
     if (module.isLocked) {
       Alert.alert(
         'Module Locked',
-        'Complete the previous modules to unlock this one.',
+        'Complete the previous module to unlock this one.',
         [{ text: 'OK' }]
       );
       return;
@@ -42,10 +42,6 @@ export default function HomeScreen() {
     }
   };
 
-  const handleBack = () => {
-    router.back();
-  };
-
   const handleProfile = () => {
     // TODO: Navigate to profile screen
     Alert.alert('Profile', 'Navigate to profile screen');
@@ -53,9 +49,8 @@ export default function HomeScreen() {
 
   const renderHeader = () => (
     <View style={styles.header}>
-      <TouchableOpacity onPress={handleBack} style={styles.headerButton}>
-        <ArrowLeft size={24} color="#2b2b2b" />
-      </TouchableOpacity>
+      {/* Empty view for spacing - no back button */}
+      <View style={styles.headerSpacer} />
       
       <Text style={[GlobalTextStyles.h4, styles.headerTitle]}>
         Onboarding Modules
@@ -66,6 +61,61 @@ export default function HomeScreen() {
       </TouchableOpacity>
     </View>
   );
+
+  const renderProgressSummary = () => {
+    const unlockedModules = modules.filter(m => !m.isLocked);
+    const completedModules = modules.filter(m => m.isCompleted);
+    const totalModules = modules.length;
+
+    return (
+      <View style={styles.progressSummary}>
+        <Text style={[GlobalTextStyles.h5, styles.progressTitle]}>
+          Your Progress
+        </Text>
+        <View style={styles.progressStats}>
+          <View style={styles.progressStat}>
+            <Text style={[GlobalTextStyles.h3, styles.progressNumber]}>
+              {completedModules.length}
+            </Text>
+            <Text style={[GlobalTextStyles.bodySmall, styles.progressLabel]}>
+              Completed
+            </Text>
+          </View>
+          <View style={styles.progressStat}>
+            <Text style={[GlobalTextStyles.h3, styles.progressNumber]}>
+              {unlockedModules.length}
+            </Text>
+            <Text style={[GlobalTextStyles.bodySmall, styles.progressLabel]}>
+              Available
+            </Text>
+          </View>
+          <View style={styles.progressStat}>
+            <Text style={[GlobalTextStyles.h3, styles.progressNumber]}>
+              {totalModules}
+            </Text>
+            <Text style={[GlobalTextStyles.bodySmall, styles.progressLabel]}>
+              Total
+            </Text>
+          </View>
+        </View>
+        
+        {/* Overall Progress Bar */}
+        <View style={styles.overallProgressContainer}>
+          <View style={styles.overallProgressBar}>
+            <View 
+              style={[
+                styles.overallProgressFill, 
+                { width: `${totalModules > 0 ? (completedModules.length / totalModules) * 100 : 0}%` }
+              ]} 
+            />
+          </View>
+          <Text style={[GlobalTextStyles.caption, styles.overallProgressText]}>
+            {totalModules > 0 ? Math.round((completedModules.length / totalModules) * 100) : 0}% Complete
+          </Text>
+        </View>
+      </View>
+    );
+  };
 
   if (loading && modules.length === 0) {
     return (
@@ -92,6 +142,8 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.scrollContent}
         >
+          {modules.length > 0 && renderProgressSummary()}
+          
           <ModuleList
             modules={modules}
             onModulePress={handleModulePress}
@@ -120,6 +172,9 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
     backgroundColor: '#fffbf8',
   },
+  headerSpacer: {
+    width: 40, // Same width as headerButton to maintain center alignment
+  },
   headerButton: {
     width: 40,
     height: 40,
@@ -145,6 +200,62 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingBottom: 100, // Account for tab bar
+  },
+  progressSummary: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 24,
+    marginBottom: 24,
+    padding: 20,
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  progressTitle: {
+    color: '#2b2b2b',
+    marginBottom: 16,
+    textAlign: 'center',
+  },
+  progressStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 20,
+  },
+  progressStat: {
+    alignItems: 'center',
+  },
+  progressNumber: {
+    color: '#001e70',
+    fontWeight: '800',
+    marginBottom: 4,
+  },
+  progressLabel: {
+    color: '#666666',
+    textAlign: 'center',
+  },
+  overallProgressContainer: {
+    alignItems: 'center',
+  },
+  overallProgressBar: {
+    width: '100%',
+    height: 8,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  overallProgressFill: {
+    height: '100%',
+    backgroundColor: '#001e70',
+    borderRadius: 4,
+  },
+  overallProgressText: {
+    color: '#666666',
+    fontWeight: '600',
   },
   loadingContainer: {
     flex: 1,

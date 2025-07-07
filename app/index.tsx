@@ -22,7 +22,7 @@ const { width } = Dimensions.get("window")
 export default function LoginScreen() {
   
     const handleContinue = () => {
-    router.push('/welcome');
+    router.push('/orientation-check-in');
   };
   
   const [loading, setLoading] = useState(false)
