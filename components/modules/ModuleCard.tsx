@@ -23,19 +23,19 @@ const cardWidth = width - 48;
 
 export const ModuleCard: React.FC<ModuleCardProps> = ({ module, onPress, style }) => {
   const getStatusConfig = () => {
+    if (module.isLocked) {
+      return {
+        backgroundColor: '#9ca3af',
+        icon: <Lock size={20} color="#ffffff" />,
+        text: 'Locked',
+        textColor: '#ffffff'
+      };
+    }
     if (module.isCompleted) {
       return {
         backgroundColor: '#22c55e',
         icon: <CheckCircle size={20} color="#ffffff" />,
         text: 'Completed',
-        textColor: '#ffffff'
-      };
-    }
-    if (module.isLocked) {
-      return {
-        backgroundColor: '#6b7280',
-        icon: <Lock size={20} color="#ffffff" />,
-        text: 'Locked',
         textColor: '#ffffff'
       };
     }
@@ -59,11 +59,23 @@ export const ModuleCard: React.FC<ModuleCardProps> = ({ module, onPress, style }
 
   return (
     <TouchableOpacity
-      style={[styles.card, style]}
+      style={[
+        styles.card, 
+        module.isLocked && styles.lockedCard,
+        style
+      ]}
       onPress={() => !module.isLocked && onPress(module)}
       disabled={module.isLocked}
-      activeOpacity={0.8}
+      activeOpacity={module.isLocked ? 1 : 0.8}
     >
+      {/* Locked Overlay */}
+      {module.isLocked && (
+        <View style={styles.lockedOverlay}>
+          <Lock size={32} color="#ffffff" />
+          <Text style={styles.lockedText}>Complete Previous Module</Text>
+        </View>
+      )}
+
       {/* Status Header */}
       <View style={[styles.statusHeader, { backgroundColor: statusConfig.backgroundColor }]}>
         {statusConfig.icon}
@@ -73,35 +85,47 @@ export const ModuleCard: React.FC<ModuleCardProps> = ({ module, onPress, style }
       </View>
 
       {/* Main Content */}
-      <View style={styles.content}>
+      <View style={[styles.content, module.isLocked && styles.lockedContent]}>
         {/* Module Info Section */}
         <View style={styles.moduleInfo}>
           <View style={styles.thumbnailContainer}>
-            {module.thumbnailUrl ? (
+            {module.thumbnailUrl && !module.isLocked ? (
               <Image
                 source={{ uri: module.thumbnailUrl }}
                 style={styles.thumbnail}
                 resizeMode="cover"
               />
             ) : (
-              <View style={styles.thumbnailPlaceholder}>
-                <Video size={24} color="#666666" />
+              <View style={[styles.thumbnailPlaceholder, module.isLocked && styles.lockedThumbnail]}>
+                {module.isLocked ? (
+                  <Lock size={24} color="#9ca3af" />
+                ) : (
+                  <Video size={24} color="#666666" />
+                )}
               </View>
             )}
           </View>
 
           <View style={styles.moduleDetails}>
-            <Text style={[GlobalTextStyles.h5, styles.moduleTitle]} numberOfLines={2}>
+            <Text style={[
+              GlobalTextStyles.h5, 
+              styles.moduleTitle,
+              module.isLocked && styles.lockedText
+            ]} numberOfLines={2}>
               {module.title}
             </Text>
-            <Text style={[GlobalTextStyles.bodySmall, styles.moduleDescription]} numberOfLines={2}>
-              {module.description}
+            <Text style={[
+              GlobalTextStyles.bodySmall, 
+              styles.moduleDescription,
+              module.isLocked && styles.lockedDescription
+            ]} numberOfLines={2}>
+              {module.isLocked ? 'Complete the previous module to unlock this content.' : module.description}
             </Text>
           </View>
         </View>
 
-        {/* Tags Section */}
-        {module.tags && module.tags.length > 0 && (
+        {/* Tags Section - Hidden when locked */}
+        {!module.isLocked && module.tags && module.tags.length > 0 && (
           <View style={styles.tagsContainer}>
             {module.tags.slice(0, 5).map((tag, index) => (
               <View key={index} style={styles.tag}>
@@ -114,21 +138,29 @@ export const ModuleCard: React.FC<ModuleCardProps> = ({ module, onPress, style }
         {/* Stats Section */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Video size={16} color="#666666" />
-            <Text style={[GlobalTextStyles.caption, styles.statText]}>
-              {module.videoCount || 0} Videos
+            <Video size={16} color={module.isLocked ? "#9ca3af" : "#666666"} />
+            <Text style={[
+              GlobalTextStyles.caption, 
+              styles.statText,
+              module.isLocked && styles.lockedStatText
+            ]}>
+              {module.isLocked ? '? Videos' : `${module.videoCount || 0} Videos`}
             </Text>
           </View>
           <View style={styles.statItem}>
-            <Clock size={16} color="#666666" />
-            <Text style={[GlobalTextStyles.caption, styles.statText]}>
-              {module.duration}
+            <Clock size={16} color={module.isLocked ? "#9ca3af" : "#666666"} />
+            <Text style={[
+              GlobalTextStyles.caption, 
+              styles.statText,
+              module.isLocked && styles.lockedStatText
+            ]}>
+              {module.isLocked ? '? mins' : module.duration}
             </Text>
           </View>
         </View>
 
-        {/* Videos List */}
-        {module.videos && module.videos.length > 0 && (
+        {/* Videos List - Hidden when locked */}
+        {!module.isLocked && module.videos && module.videos.length > 0 && (
           <View style={styles.videosSection}>
             {module.videos.slice(0, 7).map((video, index) => (
               <View key={video.id} style={styles.videoItem}>
@@ -152,7 +184,7 @@ export const ModuleCard: React.FC<ModuleCardProps> = ({ module, onPress, style }
         )}
 
         {/* Progress Bar (for in-progress modules) */}
-        {module.progress > 0 && !module.isCompleted && (
+        {!module.isLocked && module.progress > 0 && !module.isCompleted && (
           <View style={styles.progressSection}>
             <View style={styles.progressBar}>
               <View 
@@ -187,6 +219,32 @@ const styles = StyleSheet.create({
     elevation: 8,
     overflow: 'hidden',
     width: cardWidth,
+    position: 'relative',
+  },
+  lockedCard: {
+    backgroundColor: '#f8f9fa',
+    shadowOpacity: 0.05,
+    elevation: 2,
+  },
+  lockedOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(156, 163, 175, 0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+    borderRadius: 16,
+  },
+  lockedText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Nunito-SemiBold' : 'Nunito-SemiBold',
+    marginTop: 8,
+    textAlign: 'center',
   },
   statusHeader: {
     flexDirection: 'row',
@@ -202,6 +260,9 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 20,
+  },
+  lockedContent: {
+    opacity: 0.6,
   },
   moduleInfo: {
     flexDirection: 'row',
@@ -225,6 +286,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  lockedThumbnail: {
+    backgroundColor: '#e5e7eb',
+  },
   moduleDetails: {
     flex: 1,
     justifyContent: 'center',
@@ -237,6 +301,10 @@ const styles = StyleSheet.create({
   moduleDescription: {
     color: '#666666',
     lineHeight: 20,
+  },
+  lockedDescription: {
+    color: '#9ca3af',
+    fontStyle: 'italic',
   },
   tagsContainer: {
     flexDirection: 'row',
@@ -269,6 +337,9 @@ const styles = StyleSheet.create({
   statText: {
     color: '#666666',
     fontWeight: '500',
+  },
+  lockedStatText: {
+    color: '#9ca3af',
   },
   videosSection: {
     marginBottom: 16,
