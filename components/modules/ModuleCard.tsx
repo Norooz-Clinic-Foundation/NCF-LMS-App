@@ -111,16 +111,19 @@ export const ModuleCard: React.FC<ModuleCardProps> = ({ module, onPress, style }
               GlobalTextStyles.h5, 
               styles.moduleTitle,
               module.isLocked && styles.lockedText
-            ]} numberOfLines={2}>
+            ]} numberOfLines={3}>
               {module.title}
             </Text>
+            
+            {/*
             <Text style={[
               GlobalTextStyles.bodySmall, 
               styles.moduleDescription,
               module.isLocked && styles.lockedDescription
-            ]} numberOfLines={2}>
+            ]} numberOfLines={1}>
               {module.isLocked ? 'Complete the previous module to unlock this content.' : module.description}
             </Text>
+            */}
           </View>
         </View>
 
@@ -174,7 +177,7 @@ export const ModuleCard: React.FC<ModuleCardProps> = ({ module, onPress, style }
                     styles.videoTitle,
                     video.isCompleted && styles.completedVideo
                   ]} 
-                  numberOfLines={1}
+                  numberOfLines={2}
                 >
                   {video.title}
                 </Text>
