@@ -5,6 +5,8 @@ import { useState, useRef, useEffect } from "react"
 import { View, StyleSheet, Dimensions, TouchableOpacity, Text, ActivityIndicator, Alert } from "react-native"
 import { Video, ResizeMode, type AVPlaybackStatus } from "expo-av"
 import { Play, Pause, Volume2, VolumeX, RotateCcw, SkipForward } from "lucide-react-native"
+import { PanGestureHandler, GestureHandlerRootView, State } from "react-native-gesture-handler"
+import type { PanGestureHandlerGestureEvent } from "react-native-gesture-handler"
 
 interface VideoPlayerProps {
   videoUrl: string
@@ -31,7 +33,11 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   const [hasError, setHasError] = useState(false)
   const [lastReportedProgress, setLastReportedProgress] = useState(0)
   const [isVideoLoaded, setIsVideoLoaded] = useState(false)
-  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>('')
+  const [currentVideoUrl, setCurrentVideoUrl] = useState<string>("")
+
+  const [isScrubbing, setIsScrubbing] = useState(false)
+  const [scrubbingPosition, setScrubbingPosition] = useState(0)
+  const [progressBarWidth, setProgressBarWidth] = useState(0)
 
   // Calculate container dimensions
   const containerHeight = width * (9 / 16) // 16:9 aspect ratio
@@ -69,7 +75,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         if (!videoUrl) {
           console.log("No video URL provided - cleaning up")
           await cleanupVideo()
-          setCurrentVideoUrl('')
+          setCurrentVideoUrl("")
           return
         }
 
@@ -80,23 +86,22 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         }
 
         console.log("Loading new video:", videoUrl)
-        
+
         // Stop and unload any existing video first
         if (isVideoLoaded || currentVideoUrl) {
           await cleanupVideo()
         }
-        
+
         // Reset states
         setIsLoading(true)
         setHasError(false)
         setLastReportedProgress(0)
         setShowControls(true)
         setCurrentVideoUrl(videoUrl)
-        
+
         // Load the new video
         await videoRef.current.loadAsync({ uri: videoUrl }, {}, false)
         setIsVideoLoaded(true)
-        
       } catch (error) {
         console.error("Error loading new video:", error)
         setHasError(true)
@@ -181,7 +186,14 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
   }
 
   const handleFastForward = async () => {
-    if (!videoRef.current || !status || !("positionMillis" in status) || !("durationMillis" in status) || !isVideoLoaded) return
+    if (
+      !videoRef.current ||
+      !status ||
+      !("positionMillis" in status) ||
+      !("durationMillis" in status) ||
+      !isVideoLoaded
+    )
+      return
 
     try {
       const newPosition = Math.min(status.durationMillis || 0, (status.positionMillis || 0) + 10000) // Fast forward 10 seconds
@@ -204,7 +216,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
     setIsLoading(false)
     setHasError(false)
     console.log("Video loaded successfully")
-    
+
     // Set initial position if provided
     if (initialProgress > 0 && videoRef.current && "durationMillis" in loadStatus && loadStatus.durationMillis) {
       try {
@@ -214,7 +226,7 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
         console.error("Error setting initial position:", error)
       }
     }
-    
+
     // Auto-play if requested
     if (autoPlay && videoRef.current) {
       try {
@@ -237,6 +249,66 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
 
     if (playbackStatus.error) {
       handleError(playbackStatus.error)
+    }
+  }
+
+  const handleProgressBarLayout = (event: any) => {
+    setProgressBarWidth(event.nativeEvent.layout.width)
+  }
+
+  const handleProgressBarPress = async (event: any) => {
+    if (!videoRef.current || !status || !("durationMillis" in status) || !status.durationMillis || !isVideoLoaded)
+      return
+
+    // Ensure progressBarWidth is valid before calculating position
+    if (!progressBarWidth || progressBarWidth <= 0) {
+      console.warn("Progress bar width is invalid, cannot seek")
+      return
+    }
+    const { locationX } = event.nativeEvent
+    const progressPercent = Math.max(0, Math.min(1, locationX / progressBarWidth))
+    const newPosition = progressPercent * status.durationMillis
+
+    // Additional safety check to ensure newPosition is finite
+    if (!isFinite(newPosition)) {
+      console.warn("Calculated position is not finite, cannot seek")
+      return
+    }
+    try {
+      await videoRef.current.setPositionAsync(newPosition)
+    } catch (error) {
+      console.error("Error seeking video:", error)
+    }
+  }
+
+  const handlePanGestureEvent = (event: PanGestureHandlerGestureEvent) => {
+    if (!status || !("durationMillis" in status) || !status.durationMillis) return
+
+    const { translationX, absoluteX } = event.nativeEvent
+    const progressPercent = Math.max(0, Math.min(1, absoluteX / progressBarWidth))
+    setScrubbingPosition(progressPercent * status.durationMillis)
+  }
+
+  const handlePanStateChange = async (event: PanGestureHandlerGestureEvent) => {
+    if (!videoRef.current || !status || !("durationMillis" in status) || !status.durationMillis || !isVideoLoaded)
+      return
+
+    const { state, absoluteX } = event.nativeEvent
+
+    if (state === State.BEGAN) {
+      setIsScrubbing(true)
+      setShowControls(true)
+    } else if (state === State.END || state === State.CANCELLED) {
+      const progressPercent = Math.max(0, Math.min(1, absoluteX / progressBarWidth))
+      const newPosition = progressPercent * status.durationMillis
+
+      try {
+        await videoRef.current.setPositionAsync(newPosition)
+      } catch (error) {
+        console.error("Error seeking video:", error)
+      } finally {
+        setIsScrubbing(false)
+      }
     }
   }
 
@@ -351,21 +423,72 @@ export const VideoPlayer: React.FC<VideoPlayerProps> = ({
               </View>
             </View>
 
-            {/* Progress Bar */}
+            {/* Interactive Progress Bar */}
             <View style={styles.progressContainer}>
-              <View style={styles.progressBar}>
-                <View
-                  style={[
-                    styles.progressFill,
-                    {
-                      width:
-                        status && "durationMillis" in status && "positionMillis" in status && status.durationMillis
-                          ? `${(status.positionMillis / status.durationMillis) * 100}%`
-                          : "0%",
-                    },
-                  ]}
-                />
-              </View>
+              <GestureHandlerRootView style={styles.progressBarContainer}>
+                <PanGestureHandler onGestureEvent={handlePanGestureEvent} onHandlerStateChange={handlePanStateChange}>
+                  <View style={styles.progressBarWrapper}>
+                    <TouchableOpacity
+                      style={styles.progressBarTouchable}
+                      onPress={handleProgressBarPress}
+                      onLayout={handleProgressBarLayout}
+                      activeOpacity={1}
+                    >
+                      <View style={styles.progressBar}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            {
+                              width: isScrubbing
+                                ? `${(scrubbingPosition / (status && "durationMillis" in status ? status.durationMillis || 1 : 1)) * 100}%`
+                                : status &&
+                                    "durationMillis" in status &&
+                                    "positionMillis" in status &&
+                                    status.durationMillis
+                                  ? `${(status.positionMillis / status.durationMillis) * 100}%`
+                                  : "0%",
+                            },
+                          ]}
+                        />
+                        {/* Scrubbing indicator */}
+                        {isScrubbing && (
+                          <View
+                            style={[
+                              styles.scrubIndicator,
+                              {
+                                left: `${(scrubbingPosition / (status && "durationMillis" in status ? status.durationMillis || 1 : 1)) * 100}%`,
+                              },
+                            ]}
+                          />
+                        )}
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Time preview during scrubbing */}
+                    {isScrubbing && (
+                      <View
+                        style={[
+                          styles.timePreview,
+                          {
+                            left: Math.max(
+                              0,
+                              Math.min(
+                                progressBarWidth - 60,
+                                (scrubbingPosition /
+                                  (status && "durationMillis" in status ? status.durationMillis || 1 : 1)) *
+                                  progressBarWidth -
+                                  30,
+                              ),
+                            ),
+                          },
+                        ]}
+                      >
+                        <Text style={styles.timePreviewText}>{formatTime(scrubbingPosition)}</Text>
+                      </View>
+                    )}
+                  </View>
+                </PanGestureHandler>
+              </GestureHandlerRootView>
             </View>
           </View>
         )}
@@ -482,14 +605,49 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
   },
+  progressBarContainer: {
+    width: "100%",
+  },
+  progressBarWrapper: {
+    position: "relative",
+  },
+  progressBarTouchable: {
+    paddingVertical: 12, // Increase touch area
+    paddingHorizontal: 0,
+  },
   progressBar: {
     height: 4,
     backgroundColor: "rgba(255, 255, 255, 0.3)",
     borderRadius: 2,
+    position: "relative",
   },
   progressFill: {
     height: "100%",
     backgroundColor: "#ffffff",
     borderRadius: 2,
+  },
+  scrubIndicator: {
+    position: "absolute",
+    top: -2,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#ffffff",
+    marginLeft: -4, // Center the indicator
+  },
+  timePreview: {
+    position: "absolute",
+    top: -35,
+    backgroundColor: "rgba(0, 0, 0, 0.8)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    minWidth: 60,
+    alignItems: "center",
+  },
+  timePreviewText: {
+    color: "#ffffff",
+    fontSize: 12,
+    fontWeight: "500",
   },
 })
