@@ -124,6 +124,7 @@ export const ModuleCard: React.FC<ModuleCardProps> = ({ module, onPress, style }
               {module.isLocked ? 'Complete the previous module to unlock this content.' : module.description}
             </Text>
             */}
+            
           </View>
         </View>
 

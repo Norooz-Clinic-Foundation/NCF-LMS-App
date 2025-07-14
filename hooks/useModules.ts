@@ -90,6 +90,7 @@ export const useModules = () => {
 
           // Determine if module is locked based on module number and previous module completion
           let isLocked = false
+          //Change back to 1 to lock the future modules and follow the completion
           if (module.module_number > 1) {
             // For modules after the first, check if the previous module is completed
             const previousModuleNumber = module.module_number - 1
