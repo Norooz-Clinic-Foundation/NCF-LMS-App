@@ -186,7 +186,7 @@ export default function VideoScreen() {
             videoUrl={currentVideoUrl}
             thumbnailUrl={module.thumbnailUrl}
             onProgress={updateProgress}
-            autoPlay={true}
+            autoPlay={false}
           />
         </View>
 
