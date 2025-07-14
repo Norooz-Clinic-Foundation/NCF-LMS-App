@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "NCF App",
-    "slug": "ncf-app",
+    "slug": "ncfapp",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -10,7 +10,10 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ncfapp"
+      "bundleIdentifier": "com.ncfapp",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "web": {
       "bundler": "metro",
@@ -21,9 +24,25 @@
       "expo-router",
       "expo-font",
       "expo-web-browser",
+      [
+        "@react-native-google-signin/google-signin",
+        {
+          "iosUrlScheme": "com.googleusercontent.apps.39709221966-us5m6f6fn75fhke5qba9vjmc98msrbkj"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "bf9cf83b-7bc4-470d-9cb8-0f3265a8c98b"
+      }
+    },
+    "owner": "valhtor",
+    "android": {
+      "package": "com.ncfapp"
     }
   }
 }
