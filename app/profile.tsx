@@ -1,7 +1,9 @@
 import React from 'react';
+import { useState, useEffect } from 'react';
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -12,18 +14,41 @@ import { router } from 'expo-router';
 import { ArrowLeft, User, Mail, Phone, MapPin } from 'lucide-react-native';
 import { GlobalTextStyles } from '../components/ui/GlobalStyles';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { getUserProfile, type UserProfile } from '../lib/user-utils';
+import { supabase } from '../lib/supabase';
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [loading, setLoading] = useState(true);
 
   const handleBack = () => {
     router.back();
   };
 
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user) {
+          const profile = await getUserProfile(user.id);
+          setUserProfile(profile);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
-      <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ArrowLeft size={24} color="#2b2b2b" />
         </TouchableOpacity>
@@ -33,11 +58,11 @@ export default function ProfileScreen() {
         </Text>
         
         <TouchableOpacity style={styles.profileIconButton}>
-          <User size={24} color="#2b2b2b" />
+          <User size={0} color="#2b2b2b" />
         </TouchableOpacity>
       </View>
 
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: Math.max(insets.bottom, 20) }]}
         showsVerticalScrollIndicator={false}
@@ -45,11 +70,19 @@ export default function ProfileScreen() {
         {/* Profile Picture and Basic Info */}
         <View style={styles.profileSection}>
           <View style={styles.profilePicture}>
-            <User size={60} color="#cccccc" />
+            {userProfile?.avatar_url ? (
+              <Image
+                source={{ uri: userProfile.avatar_url }}
+                style={styles.profileImage}
+                resizeMode="cover"
+              />
+            ) : (
+              <User size={60} color="#cccccc" />
+            )}
           </View>
           
           <Text style={[GlobalTextStyles.h3, styles.userName]}>
-            Intern Name
+            {loading ? 'Loading...' : userProfile?.full_name || 'User Name'}
           </Text>
           
           <Text style={[GlobalTextStyles.body, styles.userTitle]}>
@@ -62,7 +95,7 @@ export default function ProfileScreen() {
           <View style={styles.contactItem}>
             <Mail size={20} color="#666666" />
             <Text style={[GlobalTextStyles.body, styles.contactText]}>
-              intern@noroozclinic.com
+              {userProfile?.email || 'No email available'}
             </Text>
           </View>
           
@@ -164,7 +197,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingBottom: 16,
+    paddingBottom: 8,
     backgroundColor: '#fffbf8',
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0, 30, 112, 0.1)',
@@ -197,12 +230,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
     elevation: 3,
   },
   scrollContainer: {
@@ -210,11 +237,11 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingHorizontal: 24,
-    paddingTop: 32,
+    paddingTop: 16,
   },
   profileSection: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: 32,
   },
   profilePicture: {
     width: 120,
@@ -226,6 +253,11 @@ const styles = StyleSheet.create({
     marginBottom: 24,
     borderWidth: 3,
     borderColor: '#e5e7eb',
+  },
+  profileImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 60,
   },
   userName: {
     color: '#2b2b2b',

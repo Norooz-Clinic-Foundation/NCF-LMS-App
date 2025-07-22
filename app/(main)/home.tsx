@@ -43,8 +43,7 @@ export default function HomeScreen() {
   };
 
   const handleProfile = () => {
-    // TODO: Navigate to profile screen
-    Alert.alert('Profile', 'Navigate to profile screen');
+    router.push('/profile');
   };
 
   const renderHeader = () => (
